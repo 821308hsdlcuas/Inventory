@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory</title>
+    <style>
+        #error-message {
+            color: red;
+            display: none;
+        }
+        #loading {
+            display: block; /* Initially show loading */
+        }
+        #dValue {
+            display: none;
+        }
+        #controls {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Inventory</h1>
+
+    <label for="dropdown">Select Item:</label>
+    <select id="dropdown" aria-label="Select an item">
+        <option value="" disabled selected>Loading options...</option>
+    </select>
+
+    <div id="dValue">
+        <p>Balance Stock: <span id="columnD">0</span></p>
+        <div id="controls">
+            <button id="decreaseButton">Decrease</button>
+            <button id="increaseButton">Increase</button>
+            <button id="updateButton">Update to Spreadsheet</button>
+        </div>
+    </div>
+
+    <div id="error-message">Error fetching data. Please try again later.</div>
+
+    <script>
+        let selectedItem = "";
+
+        async function fetchData() {
+            try {
+                const response = await fetch("https://script.google.com/macros/s/AKfycbw1cTsVqj2Wzt51-51haBkrkyl95wuIzoLNdHi-r9Ecw4VV3eYCNakkdc6Q8YdtLXXg/exec"); // Replace with your actual script URL
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                document.getElementById('error-message').style.display = "block";
+                return null; // Important: Return null to handle the error gracefully
+            } 
+        }
+
+        async function updateStock(item, newBalance) {
+          try {
+            const response = await fetch("https://script.google.com/macros/s/AKfycbw1cTsVqj2Wzt51-51haBkrkyl95wuIzoLNdHi-r9Ecw4VV3eYCNakkdc6Q8YdtLXXg/exec", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ item: item, value: newBalance })
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text(); // Get error text from server
+              throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+              alert("Stock balance updated successfully!");
+            } else {
+              alert("Error updating stock balance: " + data.error);
+            }
+          } catch (error) {
+            alert("Failed to update stock balance. Please check the console for more details.");
+            console.error("Update error:", error);
+          }
+        }
+
+        async function initialize() {
+            const data = await fetchData();
+            if (data) {
+                const dropdown = document.getElementById('dropdown');
+                dropdown.innerHTML = "";
+
+                const placeholderOption = document.createElement("option");
+                placeholderOption.value = "";
+                placeholderOption.textContent = "Please Select an Item";
+                placeholderOption.selected = true;
+                placeholderOption.disabled = true;
+                dropdown.appendChild(placeholderOption);
+
+                data.dropdownOptions.forEach(option => {
+                    const optionElement = document.createElement("option");
+                    optionElement.value = option[0];
+                    optionElement.textContent = option[0];
+                    dropdown.appendChild(optionElement);
+                });
+
+                dropdown.addEventListener("change", function() {
+                    selectedItem = this.value;
+                    const correspondingValue = data.dropdownOptions.find(option => option[0] === selectedItem);
+
+                    if (correspondingValue) {
+                        document.getElementById("dValue").style.display = "block";
+                        document.getElementById("columnD").innerText = correspondingValue[1];
+                    } else {
+                        document.getElementById("dValue").style.display = "none";
+                    }
+                });
+            }
+        }
+
+        initialize(); // Call the initialization function
+
+        document.getElementById("decreaseButton").addEventListener("click", () => {
+            const balanceStockElement = document.getElementById("columnD");
+            let currentValue = parseInt(balanceStockElement.innerText, 10);
+            if (currentValue > 0) {
+                balanceStockElement.innerText = currentValue - 1;
+            }
+        });
+
+        document.getElementById("increaseButton").addEventListener("click", () => {
+            const balanceStockElement = document.getElementById("columnD");
+            let currentValue = parseInt(balanceStockElement.innerText, 10);
+            balanceStockElement.innerText = currentValue + 1;
+        });
+
+        document.getElementById("updateButton").addEventListener("click", () => {
+            const newBalance = document.getElementById("columnD").innerText;
+            if (selectedItem) {
+                updateStock(selectedItem, newBalance);
+            } else {
+                alert("Please select an item before updating.");
+            }
+        });
+    </script>
+</body>
+</html>
